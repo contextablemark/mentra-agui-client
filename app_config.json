@@ -35,7 +35,7 @@
     },
     {
       "key": "textWrapping",
-      "type": "boolean",
+      "type": "toggle",
       "label": "Smart Text Wrapping",
       "defaultValue": true
     }
