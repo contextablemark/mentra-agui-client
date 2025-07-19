@@ -90,6 +90,9 @@ class ExampleMentraOSApp extends AppServer {
       this.agentManager.createSession(uniqueSessionId, userId);
       logger.debug("Agent session created successfully", { uniqueSessionId });
 
+      // Initialize display manager for this session
+      this.responseHandler.initializeSession(uniqueSessionId, session);
+      
       // Show welcome message
       session.layouts.showTextWall("Connected to assistant");
       logger.info("Welcome message displayed", { userId, uniqueSessionId });
@@ -115,7 +118,11 @@ class ExampleMentraOSApp extends AppServer {
           );
         } catch (error) {
           logger.error('Error processing transcription:', error);
-          session.layouts.showTextWall('Sorry, I encountered an error processing your message.');
+          // Use response handler to display error through display manager
+          this.responseHandler.handleAgentEvent({
+            type: 'ERROR',
+            error: 'Failed to process transcription'
+          } as any, session, uniqueSessionId);
         }
       }
     });
@@ -125,6 +132,7 @@ class ExampleMentraOSApp extends AppServer {
       if (!data.isFinal && this.agentManager.getSession(uniqueSessionId)?.currentRunSubscription) {
         // User started speaking while agent is responding - interrupt
         this.agentManager.interruptSession(uniqueSessionId);
+        this.responseHandler.handleInterruption(uniqueSessionId);
       }
     });
 
@@ -140,7 +148,7 @@ class ExampleMentraOSApp extends AppServer {
         logger.debug("Session cleanup completed", { userId, sessionId });
       }
     });
-  }
+1  }
 }
 
 // Start the server

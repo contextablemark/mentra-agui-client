@@ -1,14 +1,31 @@
 import { AgentEvent } from '@ag-ui/core';
 import { AppSession } from '@mentra/sdk';
 import { AgentManager } from './agentManager';
+import { TextDisplayManager } from './textDisplayManager';
 import { logger } from '../utils/logger';
 
 export class ResponseHandler {
   private agentManager: AgentManager;
+  private textDisplayManager: TextDisplayManager;
   private currentMessages: Map<string, { id: string; content: string }> = new Map();
 
   constructor(agentManager: AgentManager) {
     this.agentManager = agentManager;
+    this.textDisplayManager = new TextDisplayManager();
+  }
+
+  /**
+   * Initialize display for a new session
+   */
+  initializeSession(sessionId: string, session: AppSession): void {
+    this.textDisplayManager.initializeSession(sessionId, session);
+  }
+
+  /**
+   * Handle interruption
+   */
+  handleInterruption(sessionId: string): void {
+    this.textDisplayManager.interruptDisplay(sessionId);
   }
 
   /**
@@ -38,8 +55,8 @@ export class ResponseHandler {
             delta: event.delta,
             totalLength: current.content.length
           });
-          // Display the delta on the glasses
-          session.layouts.showTextWall(event.delta);
+          // Send text chunk to display manager for buffering and scrolling
+          this.textDisplayManager.addTextChunk(sessionId, event.delta, session);
         }
         break;
 
@@ -56,6 +73,9 @@ export class ResponseHandler {
           
           // Update agent's message history with the complete response
           this.agentManager.addAssistantMessage(sessionId, message.id, message.content);
+          
+          // Notify display manager that message is complete
+          this.textDisplayManager.completeMessage(sessionId, session);
           
           // Clean up tracking
           this.currentMessages.delete(sessionId);
@@ -85,7 +105,9 @@ export class ResponseHandler {
           sessionId,
           error: event
         });
-        session.layouts.showTextWall('Sorry, I encountered an error processing your request.');
+        // Send error message through display manager
+        this.textDisplayManager.addTextChunk(sessionId, 'Sorry, I encountered an error processing your request.', session);
+        this.textDisplayManager.completeMessage(sessionId, session);
         break;
 
       // State events are handled by the backend
@@ -111,5 +133,6 @@ export class ResponseHandler {
    */
   cleanupSession(sessionId: string): void {
     this.currentMessages.delete(sessionId);
+    this.textDisplayManager.cleanupSession(sessionId);
   }
 }
