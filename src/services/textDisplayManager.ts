@@ -8,6 +8,7 @@ interface DisplayState {
   currentLinePosition: number;
   displayInterval?: NodeJS.Timeout;
   isDisplaying: boolean;
+  isPaused: boolean;
   lineBuffer: string;
   messageComplete: boolean;
 }
@@ -37,6 +38,7 @@ export class TextDisplayManager {
       lines: [],
       currentLinePosition: 0,
       isDisplaying: false,
+      isPaused: false,
       lineBuffer: '',
       messageComplete: false
     });
@@ -183,14 +185,8 @@ export class TextDisplayManager {
     const maxLines = session.capabilities?.screen?.maxTextLines || this.defaultMaxLines;
 
     const scroll = () => {
-      // Check if we've displayed all lines
-      if (state.currentLinePosition >= state.lines.length) {
-        // If message is complete and all lines shown, stop
-        if (state.messageComplete) {
-          this.stopScrolling(sessionId);
-          return;
-        }
-        // Otherwise, wait for more content
+      // Check if paused
+      if (state.isPaused) {
         state.isDisplaying = false;
         return;
       }
@@ -218,11 +214,35 @@ export class TextDisplayManager {
         content: displayText.substring(0, 50) + '...'
       });
 
-      // Advance by one line for smooth scrolling
-      state.currentLinePosition++;
+      // Check if we should stop scrolling (when last line is visible)
+      const lastLineVisible = (state.currentLinePosition + maxLines) >= state.lines.length;
+      
+      if (state.messageComplete && lastLineVisible) {
+        // All content is visible and message is complete - stop scrolling
+        logger.info('Scrolling complete - all content visible', {
+          sessionId,
+          finalPosition: state.currentLinePosition,
+          totalLines: state.lines.length,
+          maxLines
+        });
+        this.stopScrolling(sessionId);
+        return;
+      }
 
-      // Continue scrolling
-      if (state.currentLinePosition < state.lines.length || !state.messageComplete) {
+      // Check if we need to wait for more content
+      if (state.currentLinePosition >= state.lines.length && !state.messageComplete) {
+        // No more lines to show but message not complete - pause scrolling
+        state.isDisplaying = false;
+        return;
+      }
+
+      // Advance by one line for smooth scrolling (only if there are more lines to show)
+      if (state.currentLinePosition + maxLines < state.lines.length) {
+        state.currentLinePosition++;
+      }
+
+      // Continue scrolling if there's more content to show
+      if (!lastLineVisible || !state.messageComplete) {
         const scrollSpeed = this.getScrollSpeed(session);
         state.displayInterval = setTimeout(scroll, scrollSpeed);
       } else {
@@ -264,13 +284,50 @@ export class TextDisplayManager {
 
     this.stopScrolling(sessionId);
     
-    // Clear pending content
+    // Clear pending content and reset state
     state.lines = [];
     state.lineBuffer = '';
     state.currentLinePosition = 0;
     state.messageComplete = false;
+    state.isPaused = false;
 
     logger.debug('Display interrupted', { sessionId });
+  }
+
+  /**
+   * Pause display for a session
+   */
+  pauseDisplay(sessionId: string): void {
+    const state = this.displayStates.get(sessionId);
+    if (!state) return;
+
+    if (state.isDisplaying && !state.isPaused) {
+      state.isPaused = true;
+      if (state.displayInterval) {
+        clearTimeout(state.displayInterval);
+        state.displayInterval = undefined;
+      }
+      state.isDisplaying = false;
+      logger.debug('Display paused', { sessionId });
+    }
+  }
+
+  /**
+   * Resume display for a session
+   */
+  resumeDisplay(sessionId: string, session: AppSession): void {
+    const state = this.displayStates.get(sessionId);
+    if (!state) return;
+
+    if (state.isPaused && !state.isDisplaying) {
+      state.isPaused = false;
+      logger.debug('Display resumed', { sessionId });
+      
+      // Resume scrolling if there are more lines to show
+      if (state.currentLinePosition < state.lines.length || !state.messageComplete) {
+        this.startScrolling(sessionId, session);
+      }
+    }
   }
 
   /**

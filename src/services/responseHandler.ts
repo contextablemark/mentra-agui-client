@@ -129,6 +129,28 @@ export class ResponseHandler {
   }
 
   /**
+   * Pause text display for a session
+   */
+  pauseTextDisplay(sessionId: string): void {
+    this.textDisplayManager.pauseDisplay(sessionId);
+  }
+
+  /**
+   * Resume text display for a session
+   */
+  resumeTextDisplay(sessionId: string, session: AppSession): void {
+    this.textDisplayManager.resumeDisplay(sessionId, session);
+  }
+
+  /**
+   * Check if text display is paused for a session
+   */
+  isTextDisplayPaused(sessionId: string): boolean {
+    const state = this.textDisplayManager['displayStates'].get(sessionId);
+    return state ? state.isPaused : false;
+  }
+
+  /**
    * Clean up any tracking for a session
    */
   cleanupSession(sessionId: string): void {

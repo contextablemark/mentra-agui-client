@@ -141,6 +141,32 @@ class ExampleMentraOSApp extends AppServer {
       }
     });
 
+    // Listen for button press events
+    session.events.onButtonPress((data) => {
+      logger.debug('Button press event', {
+        sessionId: uniqueSessionId,
+        buttonId: data.buttonId,
+        pressType: data.pressType
+      });
+
+      // Handle short button press to toggle pause/resume
+      if (data.pressType === 'short' && this.responseHandler) {
+        if (this.responseHandler.isTextDisplayPaused(uniqueSessionId)) {
+          this.responseHandler.resumeTextDisplay(uniqueSessionId, session);
+          logger.info('Text scrolling resumed by button press', { 
+            sessionId: uniqueSessionId, 
+            buttonId: data.buttonId 
+          });
+        } else {
+          this.responseHandler.pauseTextDisplay(uniqueSessionId);
+          logger.info('Text scrolling paused by button press', { 
+            sessionId: uniqueSessionId, 
+            buttonId: data.buttonId 
+          });
+        }
+      }
+    });
+
     // automatically remove the session when the session ends
     this.addCleanupHandler(() => {
       logger.info("Cleaning up session", { userId, uniqueSessionId });
