@@ -146,8 +146,7 @@ export class ResponseHandler {
    * Check if text display is paused for a session
    */
   isTextDisplayPaused(sessionId: string): boolean {
-    const state = this.textDisplayManager['displayStates'].get(sessionId);
-    return state ? state.isPaused : false;
+    return this.textDisplayManager.isDisplayPaused(sessionId);
   }
 
   /**

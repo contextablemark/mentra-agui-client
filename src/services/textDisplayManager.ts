@@ -331,6 +331,14 @@ export class TextDisplayManager {
   }
 
   /**
+   * Check if display is paused for a session
+   */
+  isDisplayPaused(sessionId: string): boolean {
+    const state = this.displayStates.get(sessionId);
+    return state ? state.isPaused : false;
+  }
+
+  /**
    * Clean up session
    */
   cleanupSession(sessionId: string): void {

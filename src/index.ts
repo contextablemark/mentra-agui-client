@@ -142,30 +142,66 @@ class ExampleMentraOSApp extends AppServer {
     });
 
     // Listen for button press events
-    session.events.onButtonPress((data) => {
-      logger.debug('Button press event', {
-        sessionId: uniqueSessionId,
-        buttonId: data.buttonId,
-        pressType: data.pressType
-      });
-
-      // Handle short button press to toggle pause/resume
-      if (data.pressType === 'short' && this.responseHandler) {
-        if (this.responseHandler.isTextDisplayPaused(uniqueSessionId)) {
-          this.responseHandler.resumeTextDisplay(uniqueSessionId, session);
-          logger.info('Text scrolling resumed by button press', { 
-            sessionId: uniqueSessionId, 
-            buttonId: data.buttonId 
+    try {
+      session.events.onButtonPress((data) => {
+        try {
+          logger.debug('Button press event received', {
+            sessionId: uniqueSessionId,
+            buttonId: data.buttonId,
+            pressType: data.pressType,
+            userId
           });
-        } else {
-          this.responseHandler.pauseTextDisplay(uniqueSessionId);
-          logger.info('Text scrolling paused by button press', { 
-            sessionId: uniqueSessionId, 
-            buttonId: data.buttonId 
+
+          // Handle short button press to toggle pause/resume
+          if (data.pressType === 'short') {
+            if (!this.responseHandler) {
+              logger.warn('No response handler available for button press', { sessionId: uniqueSessionId });
+              return;
+            }
+
+            try {
+              const isPaused = this.responseHandler.isTextDisplayPaused(uniqueSessionId);
+              logger.debug('Current pause state', { sessionId: uniqueSessionId, isPaused });
+
+              if (isPaused) {
+                this.responseHandler.resumeTextDisplay(uniqueSessionId, session);
+                logger.info('Text scrolling resumed by button press', { 
+                  sessionId: uniqueSessionId, 
+                  buttonId: data.buttonId 
+                });
+              } else {
+                this.responseHandler.pauseTextDisplay(uniqueSessionId);
+                logger.info('Text scrolling paused by button press', { 
+                  sessionId: uniqueSessionId, 
+                  buttonId: data.buttonId 
+                });
+              }
+            } catch (displayError) {
+              logger.error('Error handling text display pause/resume', {
+                sessionId: uniqueSessionId,
+                error: displayError
+              });
+            }
+          } else {
+            logger.debug('Non-short button press ignored', {
+              sessionId: uniqueSessionId,
+              pressType: data.pressType
+            });
+          }
+        } catch (handlerError) {
+          logger.error('Error in button press event handler', {
+            sessionId: uniqueSessionId,
+            error: handlerError
           });
         }
-      }
-    });
+      });
+      logger.debug('Button press event listener registered', { sessionId: uniqueSessionId });
+    } catch (registrationError) {
+      logger.error('Failed to register button press event listener', {
+        sessionId: uniqueSessionId,
+        error: registrationError
+      });
+    }
 
     // automatically remove the session when the session ends
     this.addCleanupHandler(() => {
