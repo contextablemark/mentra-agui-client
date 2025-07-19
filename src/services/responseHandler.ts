@@ -1,6 +1,7 @@
 import { AgentEvent } from '@ag-ui/core';
 import { AppSession } from '@mentra/sdk';
 import { AgentManager } from './agentManager';
+import { logger } from '../utils/logger';
 
 export class ResponseHandler {
   private agentManager: AgentManager;
@@ -17,6 +18,10 @@ export class ResponseHandler {
     switch (event.type) {
       case 'TEXT_MESSAGE_START':
         // Initialize tracking for the new message
+        logger.debug('Agent starting response', {
+          sessionId,
+          messageId: event.messageId
+        });
         this.currentMessages.set(sessionId, {
           id: event.messageId,
           content: ''
@@ -28,6 +33,11 @@ export class ResponseHandler {
         const current = this.currentMessages.get(sessionId);
         if (current) {
           current.content += event.delta;
+          logger.debug('Agent response chunk', {
+            sessionId,
+            delta: event.delta,
+            totalLength: current.content.length
+          });
           // Display the delta on the glasses
           session.layouts.showTextWall(event.delta);
         }
@@ -37,6 +47,13 @@ export class ResponseHandler {
         // Message complete
         const message = this.currentMessages.get(sessionId);
         if (message && message.id && message.content) {
+          logger.info('Agent response complete', {
+            sessionId,
+            messageId: message.id,
+            fullResponse: message.content,
+            responseLength: message.content.length
+          });
+          
           // Update agent's message history with the complete response
           this.agentManager.addAssistantMessage(sessionId, message.id, message.content);
           
@@ -47,27 +64,45 @@ export class ResponseHandler {
 
       case 'TOOL_CALL_START':
         // Optionally show tool usage to user
-        console.log(`Tool ${event.toolCallName} started for session ${sessionId}`);
+        logger.debug('Tool call started', {
+          sessionId,
+          toolName: event.toolCallName,
+          toolCallId: event.toolCallId
+        });
         // Could display: session.layouts.showTextWall(`Using ${event.toolCallName}...`);
         break;
 
       case 'TOOL_CALL_END':
-        console.log(`Tool call completed for session ${sessionId}`);
+        logger.debug('Tool call completed', {
+          sessionId,
+          toolCallId: event.toolCallId
+        });
         break;
 
       case 'ERROR':
         // Display error to user
+        logger.error('Agent error event', {
+          sessionId,
+          error: event
+        });
         session.layouts.showTextWall('Sorry, I encountered an error processing your request.');
-        console.error('Agent error:', event);
         break;
 
       // State events are handled by the backend
       case 'STATE_SNAPSHOT':
       case 'STATE_DELTA':
+        logger.debug('State update event (ignored)', {
+          sessionId,
+          eventType: event.type
+        });
         break;
 
       default:
-        console.log(`Unhandled event type: ${event.type}`);
+        logger.warn('Unhandled event type', {
+          sessionId,
+          eventType: event.type,
+          event
+        });
     }
   }
 

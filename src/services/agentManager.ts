@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { RunAgentInputSchema, Agent, AgentEvent } from '@ag-ui/core';
 import { AppSession } from '@mentra/sdk';
+import { logger } from '../utils/logger';
 
 export interface AgentConfig {
   backendAgent: Agent;
@@ -102,6 +103,14 @@ export class AgentManager {
         context: [],
         forwardedProps: {}
       });
+      
+      logger.debug('Sending request to agent', {
+        sessionId,
+        threadId: runAgentInput.threadId,
+        runId: runAgentInput.runId,
+        messageCount: messagesToSend.length,
+        lastMessage: messagesToSend[messagesToSend.length - 1]
+      });
 
       // Reset abort controller if agent supports it
       if (sessionAgent.agent.abortController) {
@@ -116,23 +125,37 @@ export class AgentManager {
       // Subscribe to agent's event stream
       sessionAgent.currentRunSubscription = sessionAgent.agent.run(runAgentInput).subscribe({
         next: (event) => {
+          logger.debug('Received agent event', {
+            sessionId,
+            eventType: event.type,
+            event: event
+          });
+          
           if (!sessionAgent.isInterrupted) {
             onEvent(event);
           }
         },
         error: (err) => {
-          console.error('Agent runtime error:', err);
+          logger.error('Agent runtime error:', {
+            sessionId,
+            error: err.message || err,
+            stack: err.stack
+          });
           onEvent({
             type: 'ERROR',
             error: err.message || 'Unknown error occurred'
           } as any);
         },
         complete: () => {
-          console.log('Agent run completed');
+          logger.info('Agent run completed', { sessionId });
         }
       });
     } catch (err) {
-      console.error('Failed to run agent:', err);
+      logger.error('Failed to run agent:', {
+        sessionId,
+        error: err.message || err,
+        stack: err.stack
+      });
       throw err;
     }
   }
@@ -156,7 +179,7 @@ export class AgentManager {
           sessionAgent.agent.abortRun();
         }
       } catch (error) {
-        console.warn('Failed to abort agent run:', error);
+        logger.warn('Failed to abort agent run:', error);
       }
     }
 
