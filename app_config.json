@@ -1,5 +1,7 @@
 {
+  "name": "AGUI Assistant",
   "description": "MentraOS app with agui backend integration",
+  "version": "1.0.0",
   "permissions": [
     {
       "type": "MICROPHONE",
@@ -8,28 +10,33 @@
   ],
   "settings": [
     {
+      "type": "group",
+      "title": "Text Display Settings"
+    },
+    {
       "key": "scrollSpeed",
-      "type": "number",
+      "type": "slider",
       "label": "Text Scroll Speed (ms per line)",
-      "description": "How fast text scrolls on screen",
       "defaultValue": 250,
       "min": 50,
       "max": 1000
     },
     {
       "key": "lineWidth",
-      "type": "number", 
+      "type": "select",
       "label": "Characters Per Line",
-      "description": "Maximum characters per line before wrapping",
       "defaultValue": 30,
-      "min": 20,
-      "max": 60
+      "options": [
+        {"label": "Narrow (20)", "value": 20},
+        {"label": "Medium (30)", "value": 30},
+        {"label": "Wide (45)", "value": 45},
+        {"label": "Very Wide (60)", "value": 60}
+      ]
     },
     {
       "key": "textWrapping",
       "type": "boolean",
       "label": "Smart Text Wrapping",
-      "description": "Break text at sentences and phrases for better readability",
       "defaultValue": true
     }
   ],
