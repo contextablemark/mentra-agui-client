@@ -6,6 +6,7 @@ import { handleToolCall } from './tools';
 import { AgentManager } from './services/agentManager';
 import { ResponseHandler } from './services/responseHandler';
 import { createBackendAgent } from './config/agentConfig';
+import { logger } from './utils/logger';
 
 const PACKAGE_NAME = process.env.PACKAGE_NAME ?? (() => { throw new Error('PACKAGE_NAME is not set in .env file'); })();
 const MENTRAOS_API_KEY = process.env.MENTRAOS_API_KEY ?? (() => { throw new Error('MENTRAOS_API_KEY is not set in .env file'); })();
@@ -34,8 +35,8 @@ class ExampleMentraOSApp extends AppServer {
       });
       this.responseHandler = new ResponseHandler(this.agentManager);
     } catch (error) {
-      console.error('Failed to initialize backend agent:', error);
-      console.error('Please configure your agent in src/config/agentConfig.ts');
+      logger.error('Failed to initialize backend agent:', error);
+      logger.error('Please configure your agent in src/config/agentConfig.ts');
       throw error;
     }
 
@@ -78,7 +79,7 @@ class ExampleMentraOSApp extends AppServer {
     // Listen for transcriptions
     session.events.onTranscription(async (data) => {
       if (data.isFinal) {
-        console.log("Transcript received:", data.text);
+        logger.debug("Transcript received:", { text: data.text, userId, sessionId: uniqueSessionId });
         
         try {
           // Process transcription through agent
@@ -91,7 +92,7 @@ class ExampleMentraOSApp extends AppServer {
             }
           );
         } catch (error) {
-          console.error('Error processing transcription:', error);
+          logger.error('Error processing transcription:', error);
           session.layouts.showTextWall('Sorry, I encountered an error processing your message.');
         }
       }
@@ -121,4 +122,4 @@ class ExampleMentraOSApp extends AppServer {
 // Start the server
 const app = new ExampleMentraOSApp();
 
-app.start().catch(console.error);
+app.start().catch(logger.error);
