@@ -19,6 +19,12 @@ class ExampleMentraOSApp extends AppServer {
   private sessionIdMap = new Map<string, string>(); // userId -> sessionId mapping
 
   constructor() {
+    logger.info("Initializing MentraOS app", { 
+      packageName: PACKAGE_NAME, 
+      port: PORT, 
+      stateful: AGENT_STATEFUL 
+    });
+
     super({
       packageName: PACKAGE_NAME,
       apiKey: MENTRAOS_API_KEY,
@@ -28,12 +34,16 @@ class ExampleMentraOSApp extends AppServer {
 
     // Initialize AgentManager with backend agent
     try {
+      logger.debug("Creating backend agent");
       const backendAgent = createBackendAgent();
+      logger.debug("Backend agent created successfully");
+      
       this.agentManager = new AgentManager({
         backendAgent,
         stateful: AGENT_STATEFUL
       });
       this.responseHandler = new ResponseHandler(this.agentManager);
+      logger.info("AgentManager and ResponseHandler initialized successfully");
     } catch (error) {
       logger.error('Failed to initialize backend agent:', error);
       logger.error('Please configure your agent in src/config/agentConfig.ts');
@@ -42,6 +52,7 @@ class ExampleMentraOSApp extends AppServer {
 
     // Set up Express routes
     setupExpressRoutes(this);
+    logger.debug("Express routes configured");
   }
 
   /** Map to store active user sessions */
@@ -64,17 +75,28 @@ class ExampleMentraOSApp extends AppServer {
    * @param userId - User identifier
    */
   protected async onSession(session: AppSession, sessionId: string, userId: string): Promise<void> {
+    logger.info("New session started", { userId, sessionId });
+    
     this.userSessionsMap.set(userId, session);
 
     // Generate unique session ID for this conversation
     const uniqueSessionId = `${userId}-${Date.now()}-${uuidv4()}`;
     this.sessionIdMap.set(userId, uniqueSessionId);
+    
+    logger.debug("Generated unique session ID", { userId, uniqueSessionId });
 
-    // Create agent session
-    this.agentManager.createSession(uniqueSessionId, userId);
+    try {
+      // Create agent session
+      this.agentManager.createSession(uniqueSessionId, userId);
+      logger.debug("Agent session created successfully", { uniqueSessionId });
 
-    // Show welcome message
-    session.layouts.showTextWall("Connected to assistant");
+      // Show welcome message
+      session.layouts.showTextWall("Connected to assistant");
+      logger.info("Welcome message displayed", { userId, uniqueSessionId });
+    } catch (error) {
+      logger.error("Failed to initialize session", { userId, uniqueSessionId, error });
+      throw error;
+    }
 
     // Listen for transcriptions
     session.events.onTranscription(async (data) => {
@@ -108,18 +130,27 @@ class ExampleMentraOSApp extends AppServer {
 
     // automatically remove the session when the session ends
     this.addCleanupHandler(() => {
+      logger.info("Cleaning up session", { userId, uniqueSessionId });
       this.userSessionsMap.delete(userId);
       const sessionId = this.sessionIdMap.get(userId);
       if (sessionId) {
         this.agentManager.removeSession(sessionId);
         this.responseHandler.cleanupSession(sessionId);
         this.sessionIdMap.delete(userId);
+        logger.debug("Session cleanup completed", { userId, sessionId });
       }
     });
   }
 }
 
 // Start the server
+logger.info("Starting MentraOS app server");
 const app = new ExampleMentraOSApp();
 
-app.start().catch(logger.error);
+app.start()
+  .then(() => {
+    logger.info("MentraOS app server started successfully");
+  })
+  .catch((error) => {
+    logger.error("Failed to start MentraOS app server:", error);
+  });
