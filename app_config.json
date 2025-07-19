@@ -6,6 +6,32 @@
       "description": "To receive voice input for the assistant"
     }
   ],
-  "settings": [],
+  "settings": [
+    {
+      "key": "scrollSpeed",
+      "type": "number",
+      "label": "Text Scroll Speed (ms per line)",
+      "description": "How fast text scrolls on screen",
+      "defaultValue": 250,
+      "min": 50,
+      "max": 1000
+    },
+    {
+      "key": "lineWidth",
+      "type": "number", 
+      "label": "Characters Per Line",
+      "description": "Maximum characters per line before wrapping",
+      "defaultValue": 30,
+      "min": 20,
+      "max": 60
+    },
+    {
+      "key": "textWrapping",
+      "type": "boolean",
+      "label": "Smart Text Wrapping",
+      "description": "Break text at sentences and phrases for better readability",
+      "defaultValue": true
+    }
+  ],
   "tools": []
 }

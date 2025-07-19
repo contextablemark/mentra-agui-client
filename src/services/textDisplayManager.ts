@@ -16,7 +16,7 @@ export class TextDisplayManager {
   private displayStates: Map<string, DisplayState> = new Map();
   private defaultCharsPerLine = 30; // Default characters per line
   private defaultMaxLines = 4; // Default visible lines
-  private scrollIntervalMs = 150; // Scroll speed in milliseconds per line
+  private defaultScrollIntervalMs = 250; // Default scroll speed in milliseconds per line
   
   /**
    * Initialize display for a session
@@ -43,12 +43,24 @@ export class TextDisplayManager {
   }
 
   /**
-   * Get characters per line based on device capabilities
-   * TODO: This should be configurable or determined from device
+   * Get characters per line from user settings or device capabilities
    */
   private getCharsPerLine(session: AppSession): number {
-    // For now, use defaults. Could be enhanced based on device model
-    return this.defaultCharsPerLine;
+    return session.settings.get('lineWidth') || this.defaultCharsPerLine;
+  }
+
+  /**
+   * Get scroll speed from user settings
+   */
+  private getScrollSpeed(session: AppSession): number {
+    return session.settings.get('scrollSpeed') || this.defaultScrollIntervalMs;
+  }
+
+  /**
+   * Check if smart text wrapping is enabled
+   */
+  private isSmartWrappingEnabled(session: AppSession): boolean {
+    return session.settings.get('textWrapping') !== false; // Default to true
   }
 
   /**
@@ -65,7 +77,7 @@ export class TextDisplayManager {
     state.lineBuffer += text;
     
     // Process complete sentences or phrases (split on punctuation)
-    const processableText = this.extractProcessableText(state);
+    const processableText = this.extractProcessableText(state, session);
     if (processableText) {
       const charsPerLine = this.getCharsPerLine(session);
       const wrappedText = wrapText(processableText, charsPerLine);
@@ -89,8 +101,19 @@ export class TextDisplayManager {
   /**
    * Extract text that can be processed (complete sentences/phrases)
    */
-  private extractProcessableText(state: DisplayState): string {
-    // Look for natural break points
+  private extractProcessableText(state: DisplayState, session: AppSession): string {
+    // Check if smart wrapping is enabled
+    if (!this.isSmartWrappingEnabled(session)) {
+      // Simple mode: just return all buffered text
+      if (state.lineBuffer.length > 0) {
+        const processable = state.lineBuffer;
+        state.lineBuffer = '';
+        return processable;
+      }
+      return '';
+    }
+
+    // Smart wrapping mode: Look for natural break points
     const breakPoints = ['. ', '! ', '? ', '\n', ', '];
     let lastBreakIndex = -1;
     
@@ -108,7 +131,8 @@ export class TextDisplayManager {
     }
 
     // If buffer is getting long without break points, process anyway
-    if (state.lineBuffer.length > this.defaultCharsPerLine * 2) {
+    const charsPerLine = this.getCharsPerLine(session);
+    if (state.lineBuffer.length > charsPerLine * 2) {
       const processable = state.lineBuffer;
       state.lineBuffer = '';
       return processable;
@@ -199,7 +223,8 @@ export class TextDisplayManager {
 
       // Continue scrolling
       if (state.currentLinePosition < state.lines.length || !state.messageComplete) {
-        state.displayInterval = setTimeout(scroll, this.scrollIntervalMs);
+        const scrollSpeed = this.getScrollSpeed(session);
+        state.displayInterval = setTimeout(scroll, scrollSpeed);
       } else {
         this.stopScrolling(sessionId);
       }
