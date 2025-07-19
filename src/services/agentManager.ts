@@ -36,14 +36,10 @@ export class AgentManager {
       return this.sessionAgents.get(sessionId)!;
     }
 
-    // Clone the backend agent for this session
-    let agent: Agent;
-    if (this.config.backendAgent.clone) {
-      agent = this.config.backendAgent.clone();
-    } else {
-      // Fallback if clone isn't implemented
-      agent = Object.create(this.config.backendAgent);
-    }
+    // Use the shared backend agent instance for this session
+    // Following TwilioAgent pattern: HttpAgent doesn't support cloning,
+    // so we share the instance but use unique threadIds for conversation separation
+    const agent = this.config.backendAgent;
 
     // Create new session
     const sessionAgent: SessionAgent = {
