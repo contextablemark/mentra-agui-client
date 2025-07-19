@@ -14,8 +14,8 @@ const PORT = parseInt(process.env.PORT || '3000');
 const AGENT_STATEFUL = process.env.AGENT_STATEFUL !== 'false'; // Default to true
 
 class ExampleMentraOSApp extends AppServer {
-  private agentManager: AgentManager;
-  private responseHandler: ResponseHandler;
+  private agentManager?: AgentManager;
+  private responseHandler?: ResponseHandler;
   private sessionIdMap = new Map<string, string>(); // userId -> sessionId mapping
 
   constructor() {
@@ -32,27 +32,10 @@ class ExampleMentraOSApp extends AppServer {
       publicDir: path.join(__dirname, '../public'),
     });
 
-    // Initialize AgentManager with backend agent
-    try {
-      logger.debug("Creating backend agent");
-      const backendAgent = createBackendAgent();
-      logger.debug("Backend agent created successfully");
-      
-      this.agentManager = new AgentManager({
-        backendAgent,
-        stateful: AGENT_STATEFUL
-      });
-      this.responseHandler = new ResponseHandler(this.agentManager);
-      logger.info("AgentManager and ResponseHandler initialized successfully");
-    } catch (error) {
-      logger.error('Failed to initialize backend agent:', error);
-      logger.error('Please configure your agent in src/config/agentConfig.ts');
-      throw error;
-    }
-
     // Set up Express routes
     setupExpressRoutes(this);
     logger.debug("Express routes configured");
+    logger.info("MentraOS app initialized - agent will be created per session");
   }
 
   /** Map to store active user sessions */
@@ -85,7 +68,28 @@ class ExampleMentraOSApp extends AppServer {
     
     logger.debug("Generated unique session ID", { userId, uniqueSessionId });
 
+    // Get AG-UI backend URL from user settings
+    const backendUrl = session.settings.get<string>('AgUiBackend');
+    
+    if (!backendUrl || backendUrl.trim() === '') {
+      logger.warn("No AG-UI backend configured for user", { userId });
+      session.layouts.showTextWall("Please configure AG-UI Backend URL in app settings");
+      return;
+    }
+
     try {
+      // Initialize AgentManager with user's backend URL
+      logger.debug("Creating backend agent with URL", { backendUrl, userId });
+      const backendAgent = createBackendAgent(backendUrl);
+      logger.debug("Backend agent created successfully", { userId });
+      
+      this.agentManager = new AgentManager({
+        backendAgent,
+        stateful: AGENT_STATEFUL
+      });
+      this.responseHandler = new ResponseHandler(this.agentManager);
+      logger.info("AgentManager and ResponseHandler initialized for session", { userId });
+
       // Create agent session
       this.agentManager.createSession(uniqueSessionId, userId);
       logger.debug("Agent session created successfully", { uniqueSessionId });
@@ -98,12 +102,13 @@ class ExampleMentraOSApp extends AppServer {
       logger.info("Welcome message displayed", { userId, uniqueSessionId });
     } catch (error) {
       logger.error("Failed to initialize session", { userId, uniqueSessionId, error });
-      throw error;
+      session.layouts.showTextWall("Failed to connect to AG-UI backend. Please check your configuration.");
+      return;
     }
 
     // Listen for transcriptions
     session.events.onTranscription(async (data) => {
-      if (data.isFinal) {
+      if (data.isFinal && this.agentManager && this.responseHandler) {
         logger.debug("Transcript received:", { text: data.text, userId, sessionId: uniqueSessionId });
         
         try {
@@ -113,7 +118,7 @@ class ExampleMentraOSApp extends AppServer {
             data.text,
             (event) => {
               // Handle agent events
-              this.responseHandler.handleAgentEvent(event, session, uniqueSessionId);
+              this.responseHandler!.handleAgentEvent(event, session, uniqueSessionId);
             }
           );
         } catch (error) {
@@ -129,7 +134,7 @@ class ExampleMentraOSApp extends AppServer {
 
     // Listen for interruptions (user speaking while agent is responding)
     session.events.onTranscription((data) => {
-      if (!data.isFinal && this.agentManager.getSession(uniqueSessionId)?.currentRunSubscription) {
+      if (!data.isFinal && this.agentManager && this.responseHandler && this.agentManager.getSession(uniqueSessionId)?.currentRunSubscription) {
         // User started speaking while agent is responding - interrupt
         this.agentManager.interruptSession(uniqueSessionId);
         this.responseHandler.handleInterruption(uniqueSessionId);
@@ -141,7 +146,7 @@ class ExampleMentraOSApp extends AppServer {
       logger.info("Cleaning up session", { userId, uniqueSessionId });
       this.userSessionsMap.delete(userId);
       const sessionId = this.sessionIdMap.get(userId);
-      if (sessionId) {
+      if (sessionId && this.agentManager && this.responseHandler) {
         this.agentManager.removeSession(sessionId);
         this.responseHandler.cleanupSession(sessionId);
         this.sessionIdMap.delete(userId);

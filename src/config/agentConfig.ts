@@ -1,13 +1,16 @@
 import { HttpAgent } from '@ag-ui/client';
 
-// Create the AG-UI HTTP backend agent - identical to TwilioAgent setup
-export function createBackendAgent() {
-  const AGUI_BACKEND_URL = process.env.AGUI_BACKEND_URL || 'http://localhost:8000/chat';
+// Create the AG-UI HTTP backend agent with configurable URL
+export function createBackendAgent(backendUrl: string) {
+  if (!backendUrl || backendUrl.trim() === '') {
+    throw new Error('AG-UI Backend URL is required');
+  }
+
   const AGUI_API_KEY = process.env.AGUI_API_KEY;
 
   // Create the backend agent using HttpAgent from @ag-ui/client
   const backendAgent = new HttpAgent({
-    url: AGUI_BACKEND_URL,
+    url: backendUrl,
     headers: AGUI_API_KEY ? {
       Authorization: `Bearer ${AGUI_API_KEY}`
     } : {}
