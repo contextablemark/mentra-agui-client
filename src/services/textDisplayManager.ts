@@ -159,8 +159,7 @@ export class TextDisplayManager {
       state.lineBuffer = '';
     }
 
-    // Add spacing after message
-    state.lines.push(''); // Empty line for spacing
+    // Mark message as complete
     state.messageComplete = true;
 
     logger.info('Message complete', {
