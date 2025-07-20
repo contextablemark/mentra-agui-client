@@ -141,8 +141,25 @@ class ExampleMentraOSApp extends AppServer {
       }
     });
 
+    // Debug session.events object
+    logger.debug('Session events object inspection', {
+      sessionId: uniqueSessionId,
+      hasOnButtonPress: typeof session.events.onButtonPress === 'function',
+      availableMethods: Object.getOwnPropertyNames(session.events).filter(prop => typeof session.events[prop] === 'function'),
+      sessionEventsPrototype: Object.getOwnPropertyNames(Object.getPrototypeOf(session.events))
+    });
+
     // Listen for button press events
     try {
+      if (typeof session.events.onButtonPress !== 'function') {
+        logger.error('onButtonPress method does not exist on session.events', {
+          sessionId: uniqueSessionId,
+          sessionEventsType: typeof session.events,
+          availableMethods: Object.keys(session.events)
+        });
+        return;
+      }
+
       session.events.onButtonPress((data) => {
         try {
           logger.debug('Button press event received', {
